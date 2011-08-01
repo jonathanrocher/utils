@@ -4,12 +4,6 @@ multi-file search and replace
 
 import os
 from distutils.dir_util import mkpath
-import logging
-
-logger = logging.getLogger()
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-logger.addHandler(console_handler)
 
 def search_for_files(folder_path, extension_list = [".py"], 
                      exclude_file_list = []):
