@@ -7,7 +7,7 @@ from distutils.dir_util import mkpath
 import shutil
 
 def search_for_files(folder_path, extension_list = [".py"], 
-                     exclude_file_list = []):
+                     exclude_file_list = [], include_file_list = None):
     """ Recusively search for the eligible files containing string1. 
         Apply this to all
         files with extension in extension_list and that are not in 
@@ -32,22 +32,33 @@ def search_for_files(folder_path, extension_list = [".py"],
         elif os.path.isdir(member):
            eligible_files += search_for_files(member, 
                                               extension_list, 
-                                              exclude_file_list)
+                                              exclude_file_list,
+                                              include_file_list)
         else:
             #print("   Skipping %s." % os.path.abspath(member))
             pass
     return eligible_files
 
 
-def file_to_apply(filename, extension_list, exclude_file_list):
-    """ Has the filename an extension in extension_list and is it not 
-        contained in the exclusion list?
+def file_to_apply(filename, extension_list, exclude_file_list, 
+                  include_file_list):
+    """ Retain the filename for replacement?
+        Must have the correct extension and 
+        - be in the include_file_list
+        or
+        - not be in the exclude_file_list
 
-        FIXME: make smarter filters
     """
+    if set(exclude_file_list).intersection(set(include_file_list)) is not None:
+        raise RuntimeError("There are elements shared between exclude_file_list"
+                           " and include_file_list.")
+    
     #print("      testing %s" % filename)
     condition = (os.path.splitext(filename)[1] in extension_list
-                 and filename not in exclude_file_list)
+                 and (os.path.split(filename)[1] not in exclude_file_list 
+                 or os.path.split(filename)[1] in include_file_list 
+                 or os.path.splitext(os.path.split(filename)[1])[0] 
+                 in include_file_list ))
     
     return condition
 
@@ -84,7 +95,8 @@ def find_and_replace(filepath, new_filepath, string1, string2):
         f.close()
 
 def main(folder_path, string1, string2 = "", extension_list = [".py"], 
-         exclude_file_list = [], safe = True, postfix = "2"):
+         exclude_file_list = [], include_file_list = None, safe = True, 
+         postfix = "2"):
     """ Manages the search a replace behavior
     """
     # Create a copy of the folder. 
@@ -94,14 +106,19 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
 
     eligible_files = search_for_files(folder_path,
                                       extension_list, 
-                                      exclude_file_list = [])
+                                      exclude_file_list, 
+                                      include_file_list)
     
     # Create the whole directory structure. The eligible files will be 
     # overwritten
     if safe:
-        shutil.copytree(folder_path,folder_path.replace(containing_folder, 
-                                                    containing_folder+postfix))
-
+        target_folder = folder_path.replace(containing_folder, 
+                                            containing_folder+postfix)
+        if os.path.exists(target_folder):
+            raise IOError("Target folder %s already exists. Aborting..." % 
+                          target_folder)
+        shutil.copytree(folder_path,)
+    
     for files in eligible_files:
         if safe:
             target_filename = files.replace(containing_folder, 
@@ -115,30 +132,58 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
 
         find_and_replace(files, target_filename, string1, string2)
         
+def parse_file_list(string):
+    """ expect a list in the form of a string. Return a list of strings.
+    """
+    my_list = []
+    string = string.replace("[","")
+    string = string.replace("]","")
+    for name in string.split(","):
+        my_list.append(name)
+
+    return my_list
+
 if __name__ == "__main__":
-    # FIXME: use a nicer argparse interface
+    # FIXME: use a nicer argparse interface or better a traits UI!
     import sys
     if len(sys.argv) < 3:
         raise OSError("3 arguments must be provided to the multi-search-replace"
                       " utility. Only received %s." % len(sys.argv))
 
     else:
+        import pdb ; pdb.set_trace()
         folder_path = sys.argv[1]
         string1 = sys.argv[2]
         if len(sys.argv) >= 4:
             string2 = sys.argv[3]
             if len(sys.argv) >= 5:
                 safe = sys.argv[4]
-                if len(sys.argv) == 6:
+                if len(sys.argv) >= 6:
                     postfix = sys.argv[5]
+                    if len(sys.argv) >= 7:
+                        exclude_file_list = parse_file_list(sys.argv[6])
+                        if len(sys.argv) >= 7:
+                            include_file_list = parse_file_list(sys.argv[7])
+                        else:
+                            include_file_list = []
+                    else:
+                        include_file_list = []
+                        exclude_file_list = ['__init__']
                 else:
+                    include_file_list = []
+                    exclude_file_list = ['__init__']
                     postfix = "2"
             else:
-                safe = True
+                include_file_list = []
+                exclude_file_list = ['__init__']
                 postfix = "2"
+                safe = True
         else:
-            string2 = ""
+            include_file_list = []
+            exclude_file_list = ['__init__']
+            postfix = "2"            
             safe = True
-            postfix = "2"
+            string2 = ""
 
-        main(folder_path, string1, string2, safe = safe)
+        main(folder_path, string1, string2, safe = safe, exclude_file_list = 
+             exclude_file_list, include_file_list = include_file_list)
