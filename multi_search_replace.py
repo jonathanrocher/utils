@@ -4,6 +4,7 @@ multi-file search and replace
 
 import os
 from distutils.dir_util import mkpath
+import shutil
 
 def search_for_files(folder_path, extension_list = [".py"], 
                      exclude_file_list = []):
@@ -95,16 +96,19 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
                                       extension_list, 
                                       exclude_file_list = [])
     
-    # FIXME: create the tree structure automatically and recursively
+    # Create the whole directory structure. The eligible files will be 
+    # overwritten
+    if safe:
+        shutil.copytree(folder_path,folder_path.replace(containing_folder, 
+                                                    containing_folder+postfix))
 
     for files in eligible_files:
         if safe:
             target_filename = files.replace(containing_folder, 
                                             containing_folder + postfix)
             if not os.path.exists(os.path.dirname(target_filename)):
-                raise OSError("A new tree structure identical to the one to "
-                             "replace must be created. The folder name %s "
-                             "simply must be added the postfix %s" % 
+                raise OSError("The target filename %s doesn't exist but "
+                              "should. Investigate" % 
                              (folder_path, postfix))
         else:
             target_filename = files
@@ -115,8 +119,8 @@ if __name__ == "__main__":
     # FIXME: use a nicer argparse interface
     import sys
     if len(sys.argv) < 3:
-        logger.error("3 arguments must be provided to the multi-search-replace "
-                     "utility. Only received %s." % len(sys.argv))
+        raise OSError("3 arguments must be provided to the multi-search-replace"
+                      " utility. Only received %s." % len(sys.argv))
 
     else:
         folder_path = sys.argv[1]
