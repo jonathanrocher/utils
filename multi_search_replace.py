@@ -4,8 +4,12 @@ multi-file search and replace
 
 import os
 from distutils.dir_util import mkpath
-import distutils
-import shutil
+import logging
+
+logger = logging.getLogger()
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+logger.addHandler(console_handler)
 
 def search_for_files(folder_path, extension_list = [".py"], 
                      exclude_file_list = []):
@@ -16,42 +20,43 @@ def search_for_files(folder_path, extension_list = [".py"],
         If safe == True, a copy of the folder is created and both are kept
     """
 
-    logger.info("Now dealing with folder %s" % os.path.abspath(folder_path))
+    print("Now dealing with folder %s" % os.path.abspath(folder_path))
     content = os.listdir(folder_path)
     os.chdir(folder_path)
 
     # list of files eligible for replacement
     eligible_files = []
-    # stores the folder structure to recreate it if necessary
-    locations = [folder_path]
 
     for member in content:
-        logger.info("   Now dealing with %s" % os.path.abspath(member))
-        if os.isfile(member):
+        print("   Now dealing with %s" % os.path.abspath(member))
+        if os.path.isfile(member):
             if file_to_apply(member, extension_list, 
                              exclude_file_list):
                 eligible_files += os.path.abspath(member)
-        elif os.isdir(member):
-           output = search_for_files(member, 
-                                     extension_list, 
-                                     exclude_file_list)
-           eligible_files += output[0]
-           locations += output[1]
+        elif os.path.isdir(member):
+           eligible_files += search_for_files(member, 
+                                              extension_list, 
+                                              exclude_file_list)
         else:
-            logger.info("   Skipping %s." % os.path.abspath(member))
+            print("   Skipping %s." % os.path.abspath(member))
 
-    return eligible_files, locations
+    return eligible_files
 
 
 def file_to_apply(filename, extension_list, exclude_file_list):
     """ Has the filename an extension in extension_list and is it not 
         contained in the exclusion list?
+
+        FIXME: make smarter filters
     """
-    return (os.path.splitext(member)[1] in extension_list 
-            and member not in exclude_file_list)
+    print("      testing %s" % filename)
+    condition = (os.path.splitext(filename)[1] in extension_list
+                 and filename not in exclude_file_list)
+    
+    return condition
 
 
-def search_and_replace(filepath, new_filepath, string1, string2):
+def find_and_replace(filepath, new_filepath, string1, string2):
     """ Search for a string1 inside a text file. Replace by string2 and write 
     into a new file whose filepath is returned.
 
@@ -68,8 +73,8 @@ def search_and_replace(filepath, new_filepath, string1, string2):
     content = f.read()
     while content.find(string1) != -1:
         num_occurences += 1
-        location = content.find(string1)
-        new_content = content[location]+string2+content[location+len(string1)]
+        offset = content.find(string1)
+        new_content = content[offset]+string2+content[offset+len(string1)]
         content = new_content
     f.close()
 
@@ -78,19 +83,54 @@ def search_and_replace(filepath, new_filepath, string1, string2):
     f.close()
 
 def main(folder_path, string1, string2 = "", extension_list = [".py"], 
-         exclude_file_list = [], safe = True, new_name = "2"):
+         exclude_file_list = [], safe = True, postfix = "2"):
+    """ Manages the search a replace behavior
+    """
     # Create a copy of the folder. 
-    target = folder_path+new_name
-    mkpath(target)
-
-    eligible_files, locations = search_for_files(folder_path, string1, 
-                                                 extension_list, 
-                                                 exclude_file_list = [])
-    locations = set(locations)
-
-    # create new tree structure
-
+    eligible_files = search_for_files(folder_path,
+                                      extension_list, 
+                                      exclude_file_list = [])
+    
+    # FIXME: create the tree structure automatically and recursively
+    print "eligible_files", eligible_files
 
     for files in eligible_files:
-        search_and_replace(files, files)
+        if safe:
+            target_filename = files.replace(folder_path,folder_path+postfix)
+            if not os.path.exists(os.path.dirname(target_filename)):
+                raise OSError("A new tree structure identical to the one to "
+                             "replace must be created. The folder name %s "
+                             "simply must be added the postfix %s" % 
+                             (folder_path, postfix))
+        else:
+            target_filename = files
+
+        find_and_replace(files, target_filename)
         
+if __name__ == "__main__":
+    # FIXME: use a nicer argparse interface
+    import sys
+    if len(sys.argv) < 3:
+        logger.error("3 arguments must be provided to the multi-search-replace "
+                     "utility. Only received %s." % len(sys.argv))
+
+    else:
+        folder_path = sys.argv[1]
+        string1 = sys.argv[2]
+        if len(sys.argv) >= 4:
+            string2 = sys.argv[3]
+            if len(sys.argv) >= 5:
+                safe = sys.argv[4]
+                if len(sys.argv) == 6:
+                    postfix = sys.argv[5]
+                else:
+                    postfix = "2"
+            else:
+                safe = True
+                postfix = "2"
+        else:
+            string2 = ""
+            safe = True
+            postfix = "2"
+
+        main(folder_path, string1, string2, safe = safe)
