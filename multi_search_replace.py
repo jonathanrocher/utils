@@ -32,7 +32,10 @@ def search_for_files(folder_path, extension_list = [".py"],
         if os.path.isfile(member):
             if file_to_apply(member, extension_list, 
                              exclude_file_list):
-                eligible_files += os.path.abspath(member)
+                print("      Adding %s to the list of eligible files" 
+                      % member)
+                eligible_files.append(os.path.abspath(member))
+                print eligible_files
         elif os.path.isdir(member):
            eligible_files += search_for_files(member, 
                                               extension_list, 
@@ -64,7 +67,8 @@ def find_and_replace(filepath, new_filepath, string1, string2):
     way to do that!! 
     """
 
-    num_occurences = 0    
+    num_occurences = 0
+    print("Replacing '%s' by '%s' in %s ") % (string1,string2,filepath)
     try:
         f = open(filepath, "r")
     except Exception as e:
@@ -76,11 +80,14 @@ def find_and_replace(filepath, new_filepath, string1, string2):
         offset = content.find(string1)
         new_content = content[offset]+string2+content[offset+len(string1)]
         content = new_content
+    print "Found %s occurences of %s" % (num_occurences, string1)
     f.close()
-
-    f = open(new_filepath, "w")
-    f.write(content)
-    f.close()
+    
+    if num_occurences:
+        print "Saving to ", new_filepath
+        f = open(new_filepath, "w")
+        f.write(content)
+        f.close()
 
 def main(folder_path, string1, string2 = "", extension_list = [".py"], 
          exclude_file_list = [], safe = True, postfix = "2"):
@@ -105,7 +112,7 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
         else:
             target_filename = files
 
-        find_and_replace(files, target_filename)
+        find_and_replace(files, target_filename, string1, string2)
         
 if __name__ == "__main__":
     # FIXME: use a nicer argparse interface
