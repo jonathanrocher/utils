@@ -80,7 +80,7 @@ def find_and_replace(filepath, new_filepath, string1, string2):
         offset = content.find(string1)
         new_content = content[offset]+string2+content[offset+len(string1)]
         content = new_content
-    print "Found %s occurences of %s" % (num_occurences, string1)
+    print "*** Found %s occurences of %s. ***" % (num_occurences, string1)
     f.close()
     
     if num_occurences:
@@ -94,6 +94,10 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
     """ Manages the search a replace behavior
     """
     # Create a copy of the folder. 
+    folder_path = os.path.abspath(folder_path)
+    containing_folder = os.path.split(folder_path)[1]
+    
+
     eligible_files = search_for_files(folder_path,
                                       extension_list, 
                                       exclude_file_list = [])
@@ -103,7 +107,10 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
 
     for files in eligible_files:
         if safe:
-            target_filename = files.replace(folder_path,folder_path+postfix)
+            print "files", files
+            target_filename = files.replace(containing_folder, 
+                                            containing_folder + postfix)
+            import pdb ; pdb.set_trace()
             if not os.path.exists(os.path.dirname(target_filename)):
                 raise OSError("A new tree structure identical to the one to "
                              "replace must be created. The folder name %s "
