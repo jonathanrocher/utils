@@ -116,7 +116,6 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
     # Create a copy of the folder. 
     folder_path = os.path.abspath(folder_path)
     containing_folder = os.path.split(folder_path)[1]
-    
 
     eligible_files = search_for_files(folder_path,
                                       extension_list, 
@@ -124,7 +123,7 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
                                       include_file_list = include_file_list)
     
     # Create the whole directory structure. The eligible files will be 
-    # overwritten
+    # overwritten later on
     if safe:
         target_folder = folder_path.replace(containing_folder, 
                                             containing_folder+postfix)
@@ -132,14 +131,18 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
             raise IOError("Target folder %s already exists. Aborting..." % 
                           target_folder)
         shutil.copytree(folder_path,target_folder)
-    
+        
     for files in eligible_files:
         if safe:
-            target_filename = files.replace(containing_folder, 
-                                            containing_folder + postfix)
+            target_filename = files.replace(folder_path, 
+                                            target_folder)
             if not os.path.exists(os.path.dirname(target_filename)):
                 raise OSError("The target filename %s doesn't exist but "
-                              "should. Investigate..." % target_folder)
+                              "should. Investigate..." % target_filename)
+            elif target_filename == files:
+                raise OSError("The target filepath %s should be different from "
+                              "the original filepath %s. Investigate..." 
+                              % (target_filename, files))
         else:
             target_filename = files
 
