@@ -15,51 +15,63 @@ def search_for_files(folder_path, extension_list = [".py"],
         If safe == True, a copy of the folder is created and both are kept
     """
 
-    print("Now exploring with folder %s" % os.path.abspath(folder_path))
+    print("Now exploring folder %s" % os.path.abspath(folder_path))
+    
     content = os.listdir(folder_path)
     os.chdir(folder_path)
-
     # list of files eligible for replacement
     eligible_files = []
 
     for member in content:
+        member = os.path.abspath(member)
+        #print "member", member
         if os.path.isfile(member):
             if file_to_apply(member, extension_list, 
-                             exclude_file_list):
+                             exclude_file_list = exclude_file_list, 
+                             include_file_list = include_file_list):
                 print("      Adding %s to the eligible files" 
                       % member)
                 eligible_files.append(os.path.abspath(member))
         elif os.path.isdir(member):
-           eligible_files += search_for_files(member, 
-                                              extension_list, 
-                                              exclude_file_list,
-                                              include_file_list)
+            eligible_files += search_for_files(
+               folder_path = member, 
+               extension_list = extension_list, 
+               exclude_file_list = exclude_file_list,
+               include_file_list = include_file_list)
+            os.chdir(folder_path)
         else:
-            #print("   Skipping %s." % os.path.abspath(member))
-            pass
+            print("   Skipping %s since it is neither a file nor a directory." 
+                  % os.path.abspath(member))
+            #pass
     return eligible_files
 
 
 def file_to_apply(filename, extension_list, exclude_file_list, 
                   include_file_list):
     """ Retain the filename for replacement?
-        Must have the correct extension and 
-        - be in the include_file_list
-        or
-        - not be in the exclude_file_list
-
+        Must have the correct extension AND
+        - be in the include_file_list (with or without extension)
+        OR
+        - not be in the exclude_file_list (with or without extension)
+        if only 1 list is provided.
+        If both are provided, either or
     """
-    if set(exclude_file_list).intersection(set(include_file_list)) is not None:
-        raise RuntimeError("There are elements shared between exclude_file_list"
-                           " and include_file_list.")
-    
-    #print("      testing %s" % filename)
-    condition = (os.path.splitext(filename)[1] in extension_list
-                 and (os.path.split(filename)[1] not in exclude_file_list 
-                 or os.path.split(filename)[1] in include_file_list 
-                 or os.path.splitext(os.path.split(filename)[1])[0] 
-                 in include_file_list ))
-    
+    print "testing", filename
+    if include_file_list != [] and exclude_file_list == []:
+        condition = (os.path.splitext(filename)[1] in extension_list
+                 and (os.path.split(filename)[1] in include_file_list 
+                      or os.path.splitext(os.path.split(filename)[1])[0] 
+                      in include_file_list ))
+    elif include_file_list == [] and exclude_file_list != []:
+        condition = (os.path.splitext(filename)[1] in extension_list
+                     and (os.path.split(filename)[1] not in exclude_file_list 
+                          or os.path.splitext(os.path.split(filename)[1])[0] 
+                          not in exclude_file_list))
+    else:
+        raise ValueError("Both a exclude list and an include list were provided"
+                         "or none were provided. Please clarify by using "
+                         "either. include = %s, exclude = %s" 
+                         % (exclude_file_list, include_file_list))
     return condition
 
 
@@ -106,8 +118,8 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
 
     eligible_files = search_for_files(folder_path,
                                       extension_list, 
-                                      exclude_file_list, 
-                                      include_file_list)
+                                      exclude_file_list = exclude_file_list, 
+                                      include_file_list = include_file_list)
     
     # Create the whole directory structure. The eligible files will be 
     # overwritten
@@ -117,7 +129,7 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
         if os.path.exists(target_folder):
             raise IOError("Target folder %s already exists. Aborting..." % 
                           target_folder)
-        shutil.copytree(folder_path,)
+        shutil.copytree(folder_path,target_folder)
     
     for files in eligible_files:
         if safe:
@@ -141,6 +153,9 @@ def parse_file_list(string):
     for name in string.split(","):
         my_list.append(name)
 
+    if my_list == [""]:
+        my_list = []
+        
     return my_list
 
 if __name__ == "__main__":
@@ -151,7 +166,6 @@ if __name__ == "__main__":
                       " utility. Only received %s." % len(sys.argv))
 
     else:
-        import pdb ; pdb.set_trace()
         folder_path = sys.argv[1]
         string1 = sys.argv[2]
         if len(sys.argv) >= 4:
@@ -162,28 +176,29 @@ if __name__ == "__main__":
                     postfix = sys.argv[5]
                     if len(sys.argv) >= 7:
                         exclude_file_list = parse_file_list(sys.argv[6])
-                        if len(sys.argv) >= 7:
+                        if len(sys.argv) >= 8:
                             include_file_list = parse_file_list(sys.argv[7])
                         else:
                             include_file_list = []
                     else:
                         include_file_list = []
-                        exclude_file_list = ['__init__']
+                        exclude_file_list = []
                 else:
                     include_file_list = []
-                    exclude_file_list = ['__init__']
+                    exclude_file_list = []
                     postfix = "2"
             else:
                 include_file_list = []
-                exclude_file_list = ['__init__']
+                exclude_file_list = []
                 postfix = "2"
                 safe = True
         else:
             include_file_list = []
-            exclude_file_list = ['__init__']
+            exclude_file_list = []
             postfix = "2"            
             safe = True
             string2 = ""
 
+        #import pdb ; pdb.set_trace()
         main(folder_path, string1, string2, safe = safe, exclude_file_list = 
              exclude_file_list, include_file_list = include_file_list)
