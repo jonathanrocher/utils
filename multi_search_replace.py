@@ -57,7 +57,9 @@ def file_to_apply(filename, extension_list, exclude_file_list,
         If both are provided, either or
     """
     print "testing", filename
-    if include_file_list != [] and exclude_file_list == []:
+    if include_file_list == [] and exclude_file_list == []:
+        condition = (os.path.splitext(filename)[1] in extension_list)
+    elif include_file_list != [] and exclude_file_list == []:
         condition = (os.path.splitext(filename)[1] in extension_list
                  and (os.path.split(filename)[1] in include_file_list 
                       or os.path.splitext(os.path.split(filename)[1])[0] 
@@ -68,9 +70,9 @@ def file_to_apply(filename, extension_list, exclude_file_list,
                           or os.path.splitext(os.path.split(filename)[1])[0] 
                           not in exclude_file_list))
     else:
-        raise ValueError("Both a exclude list and an include list were provided"
-                         "or none were provided. Please clarify by using "
-                         "either. include = %s, exclude = %s" 
+        raise ValueError("Both an exclude list and include list were provided."
+                         "Please clarify by using either or None. Currently, "
+                         "include = %s, exclude = %s" 
                          % (exclude_file_list, include_file_list))
     return condition
 
@@ -137,15 +139,16 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
                                             containing_folder + postfix)
             if not os.path.exists(os.path.dirname(target_filename)):
                 raise OSError("The target filename %s doesn't exist but "
-                              "should. Investigate" % 
-                             (folder_path, postfix))
+                              "should. Investigate..." % target_folder)
         else:
             target_filename = files
 
         find_and_replace(files, target_filename, string1, string2)
+
+    return
         
-def parse_file_list(string):
-    """ expect a list in the form of a string. Return a list of strings.
+def parse_string_list(string):
+    """ Converts a list in the form of a string to a list of strings.
     """
     my_list = []
     string = string.replace("[","")
@@ -159,7 +162,7 @@ def parse_file_list(string):
     return my_list
 
 if __name__ == "__main__":
-    # FIXME: use a nicer argparse interface or better a traits UI!
+    # FIXME: use a nicer argparse interface or better a traits UI.
     import sys
     if len(sys.argv) < 3:
         raise OSError("3 arguments must be provided to the multi-search-replace"
@@ -175,30 +178,41 @@ if __name__ == "__main__":
                 if len(sys.argv) >= 6:
                     postfix = sys.argv[5]
                     if len(sys.argv) >= 7:
-                        exclude_file_list = parse_file_list(sys.argv[6])
+                        extension_list = parse_string_list(sys.argv[6])
                         if len(sys.argv) >= 8:
-                            include_file_list = parse_file_list(sys.argv[7])
+                            exclude_file_list = parse_string_list(sys.argv[7])
+                            if len(sys.argv) >= 9:
+                                include_file_list = parse_string_list(
+                                    sys.argv[8])
+                            else:
+                                include_file_list = []
                         else:
                             include_file_list = []
+                            exclude_file_list = []
                     else:
                         include_file_list = []
                         exclude_file_list = []
+                        extension_list = [".py"]
                 else:
                     include_file_list = []
                     exclude_file_list = []
+                    extension_list = [".py"]
                     postfix = "2"
             else:
                 include_file_list = []
                 exclude_file_list = []
+                extension_list = [".py"]
                 postfix = "2"
                 safe = True
         else:
             include_file_list = []
             exclude_file_list = []
+            extension_list = [".py"]
             postfix = "2"            
             safe = True
             string2 = ""
 
         #import pdb ; pdb.set_trace()
-        main(folder_path, string1, string2, safe = safe, exclude_file_list = 
+        main(folder_path = folder_path, string1 = string1, string2 = string2, 
+             safe = safe, extension_list = extension_list, exclude_file_list = 
              exclude_file_list, include_file_list = include_file_list)
