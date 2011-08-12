@@ -1,23 +1,39 @@
 """ 
-multi-file search and replace
+Multi-file search and replace. 
+
+Usage: python multi_search_replace.py folder_path string1 [string2 [safe [postfix 
+[extension_list [exclude_file_list [include_file_list [verbose]]]]]]]
+
+The resulting files are in a folder located in the same place as 'folder_path' but 
+named 'folder_path'+'postfix'.
+
+TODO: create a setup.py with an entry point to have access to it from anywhere
+TODO: Replace the positional argument type interface by an argparse or a traits 
+GUI 
 """
 
 import os
-from distutils.dir_util import mkpath
 import shutil
 
 def search_for_files(folder_path, extension_list = [".py"], 
-                     exclude_file_list = [], include_file_list = None):
+                     exclude_file_list = [], include_file_list = None, 
+                     verbose = False):
     """ Recusively search for the eligible files containing string1. 
-        Apply this to all
-        files with extension in extension_list and that are not in 
-        exclude_file_list.
+        Apply this to all files with extension in extension_list and that are 
+        not in exclude_file_list.
         If safe == True, a copy of the folder is created and both are kept
     """
 
-    print("Now exploring folder %s" % os.path.abspath(folder_path))
+    if verbose:
+        print("Now exploring folder %s" % os.path.abspath(folder_path))
     
-    content = os.listdir(folder_path)
+    try:
+        content = os.listdir(folder_path)
+    except Exception as e:
+        raise OSError("The folder_path couldnt be found (exception: %s)" % e)
+    if verbose:
+        print("Content:\n%s" % content)
+
     os.chdir(folder_path)
     # list of files eligible for replacement
     eligible_files = []
@@ -45,16 +61,18 @@ def search_for_files(folder_path, extension_list = [".py"],
             #pass
     return eligible_files
 
+################################################################################
+# File selection
+################################################################################
 
 def file_to_apply(filename, extension_list, exclude_file_list, 
-                  include_file_list):
+                  include_file_list, verbose = False):
     """ Retain the filename for replacement?
         Must have the correct extension AND
         - be in the include_file_list (with or without extension)
         OR
         - not be in the exclude_file_list (with or without extension)
         if only 1 list is provided.
-        If both are provided, either or
     """
     print "testing", filename
     if include_file_list == [] and exclude_file_list == []:
@@ -77,7 +95,7 @@ def file_to_apply(filename, extension_list, exclude_file_list,
     return condition
 
 
-def find_and_replace(filepath, new_filepath, string1, string2):
+def find_and_replace(filepath, new_filepath, string1, string2, verbose = False):
     """ Search for a string1 inside a text file. Replace by string2 and write 
     into a new file whose filepath is returned.
 
@@ -86,7 +104,9 @@ def find_and_replace(filepath, new_filepath, string1, string2):
     """
 
     num_occurences = 0
-    #print("Replacing '%s' by '%s' in %s ") % (string1,string2,filepath)
+    if verbose:
+        print("Replacing '%s' by '%s' in %s ") % (string1,string2,filepath)
+
     try:
         f = open(filepath, "r")
     except Exception as e:
@@ -108,9 +128,13 @@ def find_and_replace(filepath, new_filepath, string1, string2):
         f.write(content)
         f.close()
 
+################################################################################
+# Main
+################################################################################
+
 def main(folder_path, string1, string2 = "", extension_list = [".py"], 
          exclude_file_list = [], include_file_list = None, safe = True, 
-         postfix = "2"):
+         postfix = "2", verbose = False):
     """ Manages the search a replace behavior
     """
     # Create a copy of the folder. 
@@ -149,23 +173,48 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
         find_and_replace(files, target_filename, string1, string2)
 
     return
-        
+    
+
+################################################################################
+# Formatting of inputs
+################################################################################
+
 def parse_string_list(string):
-    """ Converts a list in the form of a string to a list of strings.
+    """ Converts a list in the form of a string to a list of strings. If the 
+        argument given is not a list looking object ("[ something ]"), there is 
+        only 1 element in the list so create a list with it.
     """
     my_list = []
-    string = string.replace("[","")
-    string = string.replace("]","")
-    for name in string.split(","):
-        my_list.append(name)
+    if string.startswith("[") and string.endswith("]"):
+        string = string.replace("[","")
+        string = string.replace("]","")
+        my_list = string.split(",")
 
-    if my_list == [""]:
-        my_list = []
-        
+        if my_list == [""]:
+            my_list = []
+
+    else:
+        my_list = [string]
+
     return my_list
 
+def parse_extension_list(ext_list):
+    """ Make sure the list of extensions has the right format: each extension 
+        must start with a dot. 
+    """
+    output = []
+    for ext in ext_list:
+        if ext.startswith("."):
+            output.append(ext)
+        else:
+            output.append("."+ext)
+    return output
+
+################################################################################
+# Interface
+################################################################################
+
 if __name__ == "__main__":
-    # FIXME: use a nicer argparse interface or better a traits UI.
     import sys
     if len(sys.argv) < 3:
         raise OSError("3 arguments must be provided to the multi-search-replace"
@@ -177,37 +226,48 @@ if __name__ == "__main__":
         if len(sys.argv) >= 4:
             string2 = sys.argv[3]
             if len(sys.argv) >= 5:
-                safe = sys.argv[4]
+                safe = bool(sys.argv[4])
                 if len(sys.argv) >= 6:
                     postfix = sys.argv[5]
                     if len(sys.argv) >= 7:
-                        extension_list = parse_string_list(sys.argv[6])
+                        extension_list = parse_extension_list(
+                            parse_string_list(sys.argv[6]))
                         if len(sys.argv) >= 8:
                             exclude_file_list = parse_string_list(sys.argv[7])
                             if len(sys.argv) >= 9:
                                 include_file_list = parse_string_list(
                                     sys.argv[8])
+                                if len(sys.argv) >= 10:
+                                    verbose = bool(sys.argv[9])
+                                else:
+                                    verbose = False
                             else:
+                                verbose = False
                                 include_file_list = []
                         else:
+                            verbose = False
                             include_file_list = []
                             exclude_file_list = []
                     else:
+                        verbose = False
                         include_file_list = []
                         exclude_file_list = []
                         extension_list = [".py"]
                 else:
+                    verbose = False
                     include_file_list = []
                     exclude_file_list = []
                     extension_list = [".py"]
                     postfix = "2"
             else:
+                verbose = False
                 include_file_list = []
                 exclude_file_list = []
                 extension_list = [".py"]
                 postfix = "2"
                 safe = True
         else:
+            verbose = False
             include_file_list = []
             exclude_file_list = []
             extension_list = [".py"]
