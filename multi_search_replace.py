@@ -78,7 +78,8 @@ def file_to_apply(filename, extension_list, exclude_file_list,
         Returns:
         - bool
     """
-    print "testing", filename
+    if verbose:
+        print "testing", filename
     if include_file_list == [] and exclude_file_list == []:
         condition = (os.path.splitext(filename)[1] in extension_list)
     elif include_file_list != [] and exclude_file_list == []:
