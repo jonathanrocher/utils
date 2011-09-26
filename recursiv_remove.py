@@ -42,22 +42,25 @@ def main(folder_path, extension_list = [".py"],
             raise IOError("Target folder %s already exists. Aborting..." % 
                           target_folder)
         shutil.copytree(folder_path,target_folder)
-        
-    for files in eligible_files:
-        if safe:
-            target_filename = files.replace(folder_path, 
-                                            target_folder)
-            if not os.path.exists(os.path.dirname(target_filename)):
-                raise OSError("The target filename %s doesn't exist but "
-                              "should. Investigate..." % target_filename)
-            elif target_filename == files:
-                raise OSError("The target filepath %s should be different from "
-                              "the original filepath %s. Investigate..." 
-                              % (target_filename, files))
-        else:
-            target_filename = files
 
-        os.remove(target_filename)
+    if eligible_files:
+        for files in eligible_files:
+            if safe:
+                target_filename = files.replace(folder_path, 
+                                                target_folder)
+                if not os.path.exists(os.path.dirname(target_filename)):
+                    raise OSError("The target filename %s doesn't exist but "
+                                  "should. Investigate..." % target_filename)
+                elif target_filename == files:
+                    raise OSError("The target filepath %s should be different from "
+                                  "the original filepath %s. Investigate..." 
+                                  % (target_filename, files))
+            else:
+                target_filename = files
+
+            os.remove(target_filename)
+    else:
+        print "No files found to remove"
 
     return
 
