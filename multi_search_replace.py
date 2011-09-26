@@ -1,11 +1,11 @@
 """ 
 Multi-file search and replace. 
 
-Usage: python multi_search_replace.py folder_path string1 [string2 [safe [postfix 
-[extension_list [exclude_file_list [include_file_list [verbose]]]]]]]
+Usage: 
+python multi_search_replace.py folder_path string1 [string2 [safe [postfix [extension_list [exclude_file_list [include_file_list [verbose]]]]]]]
 
-The resulting files are in a folder located in the same place as 'folder_path' but 
-named 'folder_path'+'postfix'.
+The resulting files are in a folder located in the same place as 'folder_path' 
+but named 'folder_path'+'postfix'.
 
 TODO: create a setup.py with an entry point to have access to it from anywhere
 TODO: Replace the positional argument type interface by an argparse or a traits 
@@ -14,6 +14,8 @@ GUI
 
 import os
 import shutil
+import warnings
+import numpy as np
 
 def search_for_files(folder_path, extension_list = [".py"], 
                      exclude_file_list = [], include_file_list = None, 
@@ -58,7 +60,6 @@ def search_for_files(folder_path, extension_list = [".py"],
         else:
             print("   Skipping %s since it is neither a file nor a directory." 
                   % os.path.abspath(member))
-            #pass
     return eligible_files
 
 ################################################################################
@@ -67,12 +68,15 @@ def search_for_files(folder_path, extension_list = [".py"],
 
 def file_to_apply(filename, extension_list, exclude_file_list, 
                   include_file_list, verbose = False):
-    """ Retain the filename for replacement?
+    """ Test if a given file is eligible for a given action. 
         Must have the correct extension AND
         - be in the include_file_list (with or without extension)
         OR
         - not be in the exclude_file_list (with or without extension)
         if only 1 list is provided.
+
+        Returns:
+        - bool
     """
     print "testing", filename
     if include_file_list == [] and exclude_file_list == []:
@@ -128,6 +132,8 @@ def find_and_replace(filepath, new_filepath, string1, string2, verbose = False):
         f.write(content)
         f.close()
 
+    return num_occurences
+
 ################################################################################
 # Main
 ################################################################################
@@ -140,12 +146,13 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
     # Create a copy of the folder. 
     folder_path = os.path.abspath(folder_path)
     containing_folder = os.path.split(folder_path)[1]
-
+    
     eligible_files = search_for_files(folder_path,
                                       extension_list, 
                                       exclude_file_list = exclude_file_list, 
                                       include_file_list = include_file_list)
-    
+    if eligible_files:
+        occurences = np.empty(len(eligible_files), dtype = np.int)
     # Create the whole directory structure. The eligible files will be 
     # overwritten later on
     if safe:
@@ -156,7 +163,7 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
                           target_folder)
         shutil.copytree(folder_path,target_folder)
         
-    for files in eligible_files:
+    for index, files in enumerate(eligible_files):
         if safe:
             target_filename = files.replace(folder_path, 
                                             target_folder)
@@ -170,7 +177,11 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
         else:
             target_filename = files
 
-        find_and_replace(files, target_filename, string1, string2)
+        occurences[index] = find_and_replace(files, target_filename, string1, 
+                                             string2)
+    
+    if occurences.max() == 0:
+        print "No occurence of the string requested was found."
 
     return
     
@@ -200,10 +211,14 @@ def parse_string_list(string):
 
 def parse_extension_list(ext_list):
     """ Make sure the list of extensions has the right format: each extension 
-        must start with a dot. 
+        must start with a dot. If it doesn't, add it. If the extension is 4 
+        char or more, issue a warning.
     """
     output = []
     for ext in ext_list:
+        if len(ext) >= 4:
+            warnings.warn("The extension %s has more than 4 characters: was "
+                          "that a typo?")
         if ext.startswith("."):
             output.append(ext)
         else:
