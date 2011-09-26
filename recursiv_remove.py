@@ -59,6 +59,7 @@ def main(folder_path, extension_list = [".py"],
                 target_filename = files
 
             os.remove(target_filename)
+        print "%s files found and removed" % len(eligible_files)
     else:
         print "No files found to remove"
 
@@ -72,7 +73,9 @@ if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
         raise OSError("2 arguments must be provided to the recursiv_remove"
-                      " utility. Only received %s." % len(sys.argv))
+                      " utility. \nUsage:\n python recursiv_remove.py "
+                      "folder_path [safe [postfix [extension_list "
+                      "[exclude_file_list [include_file_list [verbose]]]]]]")
 
     else:
         # This is horrible: replace with argparse or optparse
