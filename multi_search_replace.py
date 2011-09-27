@@ -234,7 +234,10 @@ if __name__ == "__main__":
     import sys
     if len(sys.argv) < 3:
         raise OSError("3 arguments must be provided to the multi-search-replace"
-                      " utility. Only received %s." % len(sys.argv))
+                      " utility. \nUsage:\n python multi_search_replace.py "
+                      "folder_path string1 [string2 [safe [postfix "
+                      "[extension_list [exclude_file_list [include_file_list "
+                      "[verbose]]]]]]]")
 
     else:
         folder_path = sys.argv[1]
