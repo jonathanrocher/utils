@@ -32,9 +32,7 @@ def search_for_files(folder_path, extension_list = [".py"],
     try:
         content = os.listdir(folder_path)
     except Exception as e:
-        raise OSError("The folder_path couldnt be found (exception: %s)" % e)
-    if verbose:
-        print("Content:\n%s" % content)
+        raise IOError("The folder_path couldnt be found (exception: %s)" % e)
 
     os.chdir(folder_path)
     # list of files eligible for replacement
@@ -46,7 +44,8 @@ def search_for_files(folder_path, extension_list = [".py"],
         if os.path.isfile(member):
             if file_to_apply(member, extension_list, 
                              exclude_file_list = exclude_file_list, 
-                             include_file_list = include_file_list):
+                             include_file_list = include_file_list, 
+                             verbose = verbose):
                 print("      Adding %s to the eligible files" 
                       % member)
                 eligible_files.append(os.path.abspath(member))
@@ -55,7 +54,9 @@ def search_for_files(folder_path, extension_list = [".py"],
                folder_path = member, 
                extension_list = extension_list, 
                exclude_file_list = exclude_file_list,
-               include_file_list = include_file_list)
+               include_file_list = include_file_list, 
+               verbose = verbose)
+               
             os.chdir(folder_path)
         else:
             print("   Skipping %s since it is neither a file nor a directory." 
@@ -66,8 +67,8 @@ def search_for_files(folder_path, extension_list = [".py"],
 # File selection
 ################################################################################
 
-def file_to_apply(filename, extension_list, exclude_file_list, 
-                  include_file_list, verbose = False):
+def file_to_apply(filename, extension_list = None, exclude_file_list = None, 
+                  include_file_list = None, verbose = False):
     """ Test if a given file is eligible for a given action. 
         Must have the correct extension AND
         - be in the include_file_list (with or without extension)
@@ -78,8 +79,15 @@ def file_to_apply(filename, extension_list, exclude_file_list,
         Returns:
         - bool
     """
+    if extension_list is None:
+        extension_list = []
+    if exclude_file_list is None:
+        exclude_file_list = []
+    if include_file_list is None:
+        include_file_list = []
+        
     if verbose:
-        print "testing", filename
+        print "        testing", filename
     if include_file_list == [] and exclude_file_list == []:
         condition = (os.path.splitext(filename)[1] in extension_list)
     elif include_file_list != [] and exclude_file_list == []:
@@ -103,11 +111,7 @@ def file_to_apply(filename, extension_list, exclude_file_list,
 def find_and_replace(filepath, new_filepath, string1, string2, verbose = False):
     """ Search for a string1 inside a text file. Replace by string2 and write 
     into a new file whose filepath is returned.
-
-    FIXME: Most straightfoward strategy. There is probably a more efficient 
-    way to do that!! 
     """
-
     num_occurences = 0
     if verbose:
         print("Replacing '%s' by '%s' in %s ") % (string1,string2,filepath)
@@ -118,20 +122,16 @@ def find_and_replace(filepath, new_filepath, string1, string2, verbose = False):
         raise IOError("Failed opening file with path %s with exception %s." % 
                       (filepath, e))
     content = f.read()
-    while content.find(string1) != -1:
-        num_occurences += 1
-        offset = content.find(string1)
-        new_content = content[:offset]+string2+content[offset+len(string1):]
-        content = new_content
     f.close()
-    
+
+    num_occurences = content.count(string1)
     if num_occurences:
-        print("*** Found %s occurences of %s in %s. ***" % 
-              (num_occurences, string1, filepath))
-        #print "Saving to ", new_filepath
-        f = open(new_filepath, "w")
-        f.write(content)
-        f.close()
+        new_content = content.replace(string1, string2)    
+        if verbose:
+            print("*** Found %s occurences of %s in %s. ***" % 
+                   (num_occurences, string1, filepath))
+        with open(new_filepath, "w") as f:
+            f.write(new_content)
 
     return num_occurences
 
@@ -151,7 +151,8 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
     eligible_files = search_for_files(folder_path,
                                       extension_list, 
                                       exclude_file_list = exclude_file_list, 
-                                      include_file_list = include_file_list)
+                                      include_file_list = include_file_list, 
+                                      verbose = verbose)
     if eligible_files:
         occurences = np.empty(len(eligible_files), dtype = np.int)
     # Create the whole directory structure. The eligible files will be 
@@ -164,22 +165,22 @@ def main(folder_path, string1, string2 = "", extension_list = [".py"],
                           target_folder)
         shutil.copytree(folder_path,target_folder)
         
-    for index, files in enumerate(eligible_files):
+    for index, filename in enumerate(eligible_files):
         if safe:
-            target_filename = files.replace(folder_path, 
-                                            target_folder)
+            target_filename = filename.replace(folder_path, 
+                                               target_folder)
             if not os.path.exists(os.path.dirname(target_filename)):
-                raise OSError("The target filename %s doesn't exist but "
+                raise RuntimeError("The target filename %s doesn't exist but "
                               "should. Investigate..." % target_filename)
-            elif target_filename == files:
-                raise OSError("The target filepath %s should be different from "
+            elif target_filename == filename:
+                raise RuntimeError("The target filepath %s should be different from "
                               "the original filepath %s. Investigate..." 
-                              % (target_filename, files))
+                              % (target_filename, filename))
         else:
-            target_filename = files
+            target_filename = filename
 
-        occurences[index] = find_and_replace(files, target_filename, string1, 
-                                             string2)
+        occurences[index] = find_and_replace(filename, target_filename, string1, 
+                                             string2, verbose = verbose)
     
     if occurences.max() == 0:
         print "No occurence of the string requested was found."
@@ -232,6 +233,8 @@ def parse_extension_list(ext_list):
 
 if __name__ == "__main__":
     import sys
+    DEFAULT_VERBOSE = True
+    DEFAULT_SAFE = True
     if len(sys.argv) < 3:
         raise OSError("3 arguments must be provided to the multi-search-replace"
                       " utility. \nUsage:\n python multi_search_replace.py "
@@ -245,7 +248,7 @@ if __name__ == "__main__":
         if len(sys.argv) >= 4:
             string2 = sys.argv[3]
             if len(sys.argv) >= 5:
-                safe = bool(sys.argv[4])
+                safe = eval(sys.argv[4])
                 if len(sys.argv) >= 6:
                     postfix = sys.argv[5]
                     if len(sys.argv) >= 7:
@@ -259,42 +262,42 @@ if __name__ == "__main__":
                                 if len(sys.argv) >= 10:
                                     verbose = bool(sys.argv[9])
                                 else:
-                                    verbose = False
+                                    verbose = DEFAULT_VERBOSE
                             else:
-                                verbose = False
+                                verbose = DEFAULT_VERBOSE
                                 include_file_list = []
                         else:
-                            verbose = False
+                            verbose = DEFAULT_VERBOSE
                             include_file_list = []
                             exclude_file_list = []
                     else:
-                        verbose = False
+                        verbose = DEFAULT_VERBOSE
                         include_file_list = []
                         exclude_file_list = []
                         extension_list = [".py"]
                 else:
-                    verbose = False
+                    verbose = DEFAULT_VERBOSE
                     include_file_list = []
                     exclude_file_list = []
                     extension_list = [".py"]
                     postfix = "2"
             else:
-                verbose = False
+                verbose = DEFAULT_VERBOSE
                 include_file_list = []
                 exclude_file_list = []
                 extension_list = [".py"]
                 postfix = "2"
-                safe = True
+                safe = DEFAULT_SAFE
         else:
-            verbose = False
+            verbose = DEFAULT_VERBOSE
             include_file_list = []
             exclude_file_list = []
             extension_list = [".py"]
             postfix = "2"            
-            safe = True
+            safe = DEFAULT_SAFE
             string2 = ""
 
-        #import pdb ; pdb.set_trace()
         main(folder_path = folder_path, string1 = string1, string2 = string2, 
              safe = safe, extension_list = extension_list, exclude_file_list = 
-             exclude_file_list, include_file_list = include_file_list)
+             exclude_file_list, include_file_list = include_file_list, 
+             verbose = verbose)
